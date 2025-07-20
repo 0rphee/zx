@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .single_threaded = true,
     });
 
     // Modules can depend on one another using the `std.Build.Module.addImport` function.
@@ -69,6 +70,15 @@ pub fn build(b: *std.Build) void {
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
     b.installArtifact(exe);
+
+    // add check step for better zls errors of comptime code
+    const exe_check = b.addExecutable(.{
+        .name = "zx",
+        .root_module = exe_mod,
+    });
+
+    const check = b.step("check", "Check if zx compiles");
+    check.dependOn(&exe_check.step);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
