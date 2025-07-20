@@ -1,36 +1,42 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 
 const memory = @import("memory.zig");
+const value = @import("value.zig");
+const Value = value.Value;
 
-pub const OpCode = enum(u8) { OP_RETURN };
+pub const DEBUG_TRACE_EXECUTION = true;
+
+pub const OpCode = enum(u8) {
+    OP_CONSTANT,
+    OP_RETURN,
+    _,
+    pub fn toU8(self: OpCode) u8 {
+        return @intFromEnum(self);
+    }
+};
 
 pub const Chunk = struct {
-    count: usize,
-    // capacity is stored in the array (code.len)
-    code: []OpCode,
+    // TODO: multiArrayList?
+    code: std.ArrayList(u8),
+    lines: std.ArrayList(u32),
+    constants: std.ArrayList(Value),
     pub fn new(allocator: Allocator) Chunk {
-        const code = allocator.alloc(OpCode, 0) catch |err| memory.panicAllocating(err);
-        return .{
-            .count = 0,
-            .code = code,
-        };
+        return .{ .code = ArrayList(u8).init(allocator), .lines = ArrayList(u32).init(allocator), .constants = ArrayList(Value).init(allocator) };
     }
-    pub fn free(self: *Chunk, allocator: Allocator) void {
-        allocator.free(self.code);
-        self.count = 0;
-        self.code = allocator.alloc(OpCode, 0) catch |err| memory.panicAllocating(err);
+    pub fn free(self: *Chunk) void {
+        self.code.clearAndFree();
+        self.lines.clearAndFree();
+        // TODO: original C doesn't free constants in equivalent function
+        self.constants.clearAndFree();
     }
-
-    pub fn write(self: *Chunk, allocator: Allocator, byte: OpCode) void {
-        if (self.code.len < self.count + 1) {
-            // grow chunk
-            const old_capacity = self.code.len;
-            const newCapacity = memory.growCapacity(old_capacity);
-            self.code = memory.growArray(allocator, self.code, newCapacity);
-        }
-        // add value
-        self.code[self.count] = byte;
-        self.count = self.count + 1;
+    pub fn write(self: *Chunk, byte: u8, line: u32) void {
+        self.code.append(byte) catch |err| memory.panicReallocating(err);
+        self.lines.append(line) catch |err| memory.panicReallocating(err);
+    }
+    pub fn addConstant(self: *Chunk, val: Value) usize {
+        self.constants.append(val) catch |err| memory.panicReallocating(err);
+        return self.constants.items.len - 1;
     }
 };
