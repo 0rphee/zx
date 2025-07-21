@@ -9,8 +9,13 @@ const Value = value.Value;
 pub const DEBUG_TRACE_EXECUTION = true;
 
 pub const OpCode = enum(u8) {
-    OP_CONSTANT,
-    OP_RETURN,
+    CONSTANT,
+    ADD,
+    SUBSTRACT,
+    MULTIPLY,
+    DIVIDE,
+    NEGATE,
+    RETURN,
     _,
     pub fn toU8(self: OpCode) u8 {
         return @intFromEnum(self);
