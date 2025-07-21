@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const isDigit = std.ascii.isDigit;
 pub const TokenType = enum {
     // Single-character tokens.
     LEFT_PAREN,
@@ -55,7 +56,7 @@ pub const Token = struct {
     fn make(scanner: Scanner, ty: TokenType) Token {
         return Token{
             .type = ty,
-            .slice = scanner.start[0..(scanner.current - scanner.start)],
+            .slice = scanner.start[0 .. (scanner.current - scanner.start) + 1],
             .line = scanner.line,
         };
     }
@@ -117,7 +118,7 @@ pub const Scanner = struct {
         return true;
     }
 
-    fn advance(self: *Scanner) u8 {
+    pub fn advance(self: *Scanner) u8 {
         self.current += 1;
         return (self.current - 1)[0];
     }
@@ -139,7 +140,7 @@ pub const Scanner = struct {
     fn skipWhitespace(self: *Scanner) void {
         while (true) {
             switch (self.peek()) {
-                ' ' | '\r' | '\t' => {
+                ' ', '\r' | '\t' => {
                     _ = self.advance();
                 },
                 '\n' => {
@@ -174,7 +175,7 @@ pub const Scanner = struct {
     }
 
     fn number(self: *Scanner) Token {
-        while (std.ascii.isDigit(self.peek())) {
+        while (isDigit(self.peek())) {
             _ = self.advance();
         }
 
@@ -190,4 +191,58 @@ pub const Scanner = struct {
 
         return Token.make(self.*, .NUMBER);
     }
+
+    fn identifier(self: *Scanner) Token {
+        while (isAlpha(self.peek()) or isDigit(self.peek())) self.advance();
+        return Token.make(self, self.identifierType());
+    }
+
+    fn identifierType(self: *Scanner) TokenType {
+        return switch (self.start[0]) {
+            'a' => self.checkKeyword(1, 2, "nd", .AND),
+            'c' => self.checkKeyword(1, 4, "lass", .CLASS),
+            'e' => self.checkKeyword(1, 3, "lse", .ELSE),
+            'f' => {
+                if (self.current - self.start > 1) {
+                    return switch (self.start[1]) {
+                        'a' => self.checkKeyword(2, 3, "lse", .FALSE),
+                        'o' => self.checkKeyword(2, 1, "r", .FOR),
+                        'u' => self.checkKeyword(2, 1, "n", .FUN),
+                    };
+                }
+            },
+            'i' => self.checkKeyword(1, 1, "f", .IF),
+            'n' => self.checkKeyword(1, 2, "il", .NIL),
+            'o' => self.checkKeyword(1, 1, "r", .OR),
+            'p' => self.checkKeyword(1, 4, "rint", .PRINT),
+            'r' => self.checkKeyword(1, 5, "eturn", .RETURN),
+            's' => self.checkKeyword(1, 4, "uper", .SUPER),
+            't' => {
+                if (self.current - self.start > 1) {
+                    return switch (self.start[1]) {
+                        'h' => self.checkKeyword(2, 2, "is", .THIS),
+                        'r' => self.checkKeyword(2, 2, "ue", .TRUE),
+                    };
+                }
+            },
+            'v' => self.checkKeyword(1, 2, "ar", .VAR),
+            'w' => self.checkKeyword(1, 4, "hile", .WHILE),
+        };
+    }
+
+    fn checkKeyword(self: *Scanner, start: u4, length: u4, rest: []const u8, ty: TokenType) TokenType {
+        if (std.mem.eql(self.start[start .. length + 1], // get slice of the current token
+            rest))
+        {
+            return ty;
+        }
+        return .IDENTIFIER;
+    }
 };
+
+fn isAlpha(c: u8) bool {
+    switch (c) {
+        'A'...'Z', 'a'...'z', '_' => true,
+        else => false,
+    }
+}

@@ -8,7 +8,7 @@ const debug = @import("debug.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 
-pub const InterpretResult = enum { ok, compile_err, runtime_err };
+pub const InterpretResult = enum { OK, COMPILE_ERR, RUNTIME_ERR };
 
 const STACK_MAX = 256;
 
@@ -34,9 +34,9 @@ pub const VM = struct {
         defer allocator.free(source);
 
         switch (self.interpret(&source)) {
-            .compile_err => std.process.exit(65),
-            .runtime_err => std.process.exit(70),
-            .ok => {},
+            .COMPILE_ERR => std.process.exit(65),
+            .RUNTIME_ERR => std.process.exit(70),
+            .OK => {},
         }
     }
     pub fn repl(self: *VM, stdout: std.fs.File, stdin: std.fs.File) !void {
@@ -54,13 +54,15 @@ pub const VM = struct {
         _ = self;
     }
     pub fn interpret(self: *VM, source: *const []const u8) InterpretResult {
-        // _ = source;
-        _ = compiler.compile(source);
-        // const chunk: *Chunk = compile(source);
-        // self.chunk = chunk;
-        // self.ip = @as([*]u8, self.chunk.code.items.ptr);
-        // self.stackTop = &self.stack;
-        return self.run();
+        var mayChunk: ?Chunk = compiler.compile(source);
+        if (mayChunk) |*chunk| {
+            defer chunk.free();
+            self.chunk = chunk;
+            // TODO: is this correct?
+            self.ip = self.chunk.code.items.ptr;
+            return self.run();
+        }
+        return .COMPILE_ERR;
     }
     fn readByte(vm: *VM) OpCode {
         const old = vm.ip;
@@ -97,10 +99,10 @@ pub const VM = struct {
                 .RETURN => {
                     value.printValue(self.pop());
                     std.debug.print("\n", .{});
-                    return .ok;
+                    return .OK;
                 },
                 else => {
-                    return .runtime_err;
+                    return .RUNTIME_ERR;
                 },
             }
         }

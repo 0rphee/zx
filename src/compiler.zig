@@ -1,24 +1,17 @@
 const std = @import("std");
+
+const common = @import("common.zig");
+const Chunk = common.Chunk;
 const scanner = @import("scanner.zig");
 const Scanner = scanner.Scanner;
 const Token = scanner.Token;
 
-pub fn compile(source: *const []const u8) []u8 {
-    // _ = source;
+/// if `compile` returns null, the compilation failed
+pub fn compile(source: *const []const u8) ?Chunk {
     var scanner_inst = Scanner.new(source);
-    var line: i32 = -1;
-    while (true) {
-        const token: Token = scanner_inst.scanToken();
-        if (token.line != line) {
-            std.debug.print("{d:<4}", .{token.line});
-            line = token.line;
-        } else {
-            std.debug.print("   | ", .{});
-        }
-        std.debug.print("{d:<2} '{s}'\n", .{ token.line, token.slice });
-        if (token.type == .EOF) break;
-    }
-
-    // TODO: FIX
-    return undefined;
+    _ = scanner_inst.advance();
+    _ = scanner_inst.expression();
+    _ = scanner_inst.consume(.EOF, "Expect end of expression.");
+    // TODO
+    return null;
 }

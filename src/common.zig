@@ -23,7 +23,7 @@ pub const OpCode = enum(u8) {
 };
 
 pub const Chunk = struct {
-    // TODO: multiArrayList?
+    // TODO: multiArrayList for .code and .lines?
     code: std.ArrayList(u8),
     lines: std.ArrayList(u32),
     constants: std.ArrayList(Value),
