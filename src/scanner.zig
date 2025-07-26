@@ -51,12 +51,14 @@ pub const TokenType = enum {
 
 pub const Token = struct {
     type: TokenType,
+    // the source string is kept around in memory, so it should not be freed
+    // before that
     slice: []const u8,
     line: i32,
     fn make(scanner: Scanner, ty: TokenType) Token {
         return Token{
             .type = ty,
-            .slice = scanner.start[0 .. (scanner.current - scanner.start) + 1],
+            .slice = scanner.start[0..(scanner.current - scanner.start)],
             .line = scanner.line,
         };
     }
@@ -70,6 +72,8 @@ pub const Token = struct {
 };
 
 pub const Scanner = struct {
+    // Scanner doesn't own 'source', so it does not free it
+    // All else is not allocated, so doesn't need to be freed
     source: *const []const u8,
     start: [*]const u8,
     current: [*]const u8,
@@ -83,13 +87,17 @@ pub const Scanner = struct {
         };
     }
     pub fn scanToken(self: *Scanner) Token {
+        // std.Thread.sleep(1000000000);
+        // std.debug.print("scanToken\n", .{});
         self.skipWhitespace();
 
         self.start = self.current;
 
+        // self.dumpScanner();
         if (self.isAtEnd()) return Token.make(self.*, .EOF);
 
         const c = self.advance();
+        // std.debug.print("char scanner '{c}'\n", .{c});
         return switch (c) {
             '0'...'9' => self.number(),
             '(' => Token.make(self.*, .LEFT_PAREN),
@@ -118,7 +126,7 @@ pub const Scanner = struct {
         return true;
     }
 
-    pub fn advance(self: *Scanner) u8 {
+    fn advance(self: *Scanner) u8 {
         self.current += 1;
         return (self.current - 1)[0];
     }
@@ -126,7 +134,10 @@ pub const Scanner = struct {
     fn isAtEnd(self: *Scanner) bool {
         const sourceStart: [*]const u8 = self.source.*.ptr;
         const offset: usize = @intFromPtr(self.current) - @intFromPtr(sourceStart);
-        return offset == self.source.len - 1;
+        const comp = offset >= self.source.len;
+        // std.debug.print("isAtEnd(): {any}, offset: {d}, source.len: {d}\n", .{ comp, offset, self.source.len });
+
+        return comp;
     }
 
     fn peek(self: *Scanner) u8 {
@@ -237,6 +248,14 @@ pub const Scanner = struct {
             return ty;
         }
         return .IDENTIFIER;
+    }
+
+    fn dumpScanner(self: Scanner) void {
+        std.debug.print("-------------\n", .{});
+        std.debug.print("source: {s}\n", .{self.source.*});
+        std.debug.print("start: {c}\n", .{self.start[0]});
+        std.debug.print("current: {c}\n", .{self.current[0]});
+        std.debug.print("line: {d}\n", .{self.line});
     }
 };
 

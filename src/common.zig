@@ -6,6 +6,7 @@ const memory = @import("memory.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 
+pub const DEBUG_PRINT_CODE = true;
 pub const DEBUG_TRACE_EXECUTION = true;
 
 pub const OpCode = enum(u8) {

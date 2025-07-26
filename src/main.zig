@@ -29,39 +29,13 @@ pub fn main() !u8 {
     defer std.process.argsFree(allocator, args);
 
     switch (args.len) {
-        1 => try vm_inst.repl(stdout, stdin),
+        1 => try vm_inst.repl(allocator, stdout, stdin),
         2 => try vm_inst.runFile(allocator, args[1]),
         else => {
             try stderr.writeAll("Usage: zx [path]\n");
             std.process.exit(64);
         },
     }
-
-    // std.debug.print("Opcode size: {}\n", .{@sizeOf(OpCode)});
-
-    // var chunk: Chunk = Chunk.new(allocator);
-
-    // const templine = 123;
-
-    // chunk.write(OpCode.CONSTANT.toU8(), templine);
-    // chunk.write(@truncate(chunk.addConstant(1.2)), templine);
-
-    // chunk.write(OpCode.CONSTANT.toU8(), templine);
-    // chunk.write(@truncate(chunk.addConstant(3.4)), templine);
-
-    // chunk.write(OpCode.ADD.toU8(), templine);
-
-    // chunk.write(OpCode.CONSTANT.toU8(), templine);
-    // chunk.write(@truncate(chunk.addConstant(5.6)), templine);
-
-    // chunk.write(OpCode.DIVIDE.toU8(), templine);
-
-    // chunk.write(OpCode.NEGATE.toU8(), templine);
-    // chunk.write(OpCode.RETURN.toU8(), templine);
-
-    // debug.disassembleChunk(&chunk, "test chunk");
-    // _ = vm.VM.interpret(&chunk);
-    // chunk.free();
     return 0;
 }
 

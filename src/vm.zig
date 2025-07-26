@@ -33,13 +33,13 @@ pub const VM = struct {
         const source: []const u8 = readFile(allocator, filename);
         defer allocator.free(source);
 
-        switch (self.interpret(&source)) {
+        switch (self.interpret(allocator, &source)) {
             .COMPILE_ERR => std.process.exit(65),
             .RUNTIME_ERR => std.process.exit(70),
             .OK => {},
         }
     }
-    pub fn repl(self: *VM, stdout: std.fs.File, stdin: std.fs.File) !void {
+    pub fn repl(self: *VM, allocator: std.mem.Allocator, stdout: std.fs.File, stdin: std.fs.File) !void {
         const outWriter = stdout.writer();
         const inReader = stdin.reader();
         var lineBuff: [1024]u8 = undefined;
@@ -49,16 +49,19 @@ pub const VM = struct {
                 try outWriter.writeByte('\n');
                 break;
             }
+            _ = self.interpret(allocator, &lineSlice);
             try outWriter.writeAll("> ");
         }
-        _ = self;
     }
-    pub fn interpret(self: *VM, source: *const []const u8) InterpretResult {
-        var mayChunk: ?Chunk = compiler.compile(source);
+    pub fn interpret(self: *VM, allocator: std.mem.Allocator, source: *const []const u8) InterpretResult {
+        var compParser = compiler.Parser.new(allocator, source);
+        // chunk is freed after its supposed to be run
+        defer compParser.free();
+
+        var mayChunk: ?Chunk = compParser.compile();
+
         if (mayChunk) |*chunk| {
-            defer chunk.free();
             self.chunk = chunk;
-            // TODO: is this correct?
             self.ip = self.chunk.code.items.ptr;
             return self.run();
         }
@@ -73,6 +76,8 @@ pub const VM = struct {
         return vm.chunk.constants.items[readByte(vm).toU8()];
     }
     pub fn run(self: *VM) InterpretResult {
+        std.debug.print("\n== run() ==", .{});
+        defer std.debug.print("\n", .{});
         while (true) {
             if (comptime common.DEBUG_TRACE_EXECUTION) {
                 std.debug.print("          ", .{});
@@ -83,7 +88,6 @@ pub const VM = struct {
                     std.debug.print(" ]", .{});
                 }
                 std.debug.print("\n", .{});
-                _ = debug.disassembleInstruction(self.chunk.*, @intFromPtr(self.ip) - @intFromPtr(self.chunk.code.items.ptr));
             }
 
             switch (readByte(self)) {
