@@ -17,7 +17,7 @@ pub fn main() !u8 {
     const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
-    var vm_inst = vm.VM.new();
+    var vm_inst = vm.VM.new(allocator);
     vm_inst.init();
     defer vm_inst.free();
 
@@ -29,8 +29,8 @@ pub fn main() !u8 {
     defer std.process.argsFree(allocator, args);
 
     switch (args.len) {
-        1 => try vm_inst.repl(allocator, stdout, stdin),
-        2 => try vm_inst.runFile(allocator, args[1]),
+        1 => try vm_inst.repl(stdout, stdin),
+        2 => try vm_inst.runFile(args[1]),
         else => {
             try stderr.writeAll("Usage: zx [path]\n");
             std.process.exit(64);

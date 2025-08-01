@@ -183,7 +183,10 @@ pub const Scanner = struct {
 
         // close qoute
         _ = self.advance();
-        return Token.make(self.*, .STRING);
+        // TODO: original C code doesn't seem to account for this?
+        var tok = Token.make(self.*, .STRING);
+        tok.slice = tok.slice[1 .. tok.slice.len - 1];
+        return tok;
     }
 
     fn number(self: *Scanner) Token {

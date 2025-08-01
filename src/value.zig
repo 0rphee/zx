@@ -1,11 +1,17 @@
 const std = @import("std");
 
-pub const ValueType = enum { bool, nil, number };
+const object = @import("object.zig");
+const ObjType = object.ObjType;
+const Obj = object.Obj;
+const ObjString = object.ObjString;
+
+pub const ValueType = enum { bool, nil, number, obj };
 
 pub const Value = union(ValueType) {
     bool: bool,
     nil: void,
     number: f64,
+    obj: *Obj,
     pub fn ty(value: Value) ValueType {
         return value;
     }
@@ -15,6 +21,7 @@ pub const Value = union(ValueType) {
             .bool => |v| std.debug.print("{any}", .{v}),
             .nil => std.debug.print("nil", .{}),
             .number => |v| std.debug.print("{e}", .{v}),
+            .obj => |v| v.print(),
         }
     }
 
@@ -24,8 +31,11 @@ pub const Value = union(ValueType) {
     pub fn nilVal() Value {
         return Value{ .nil = {} };
     }
-    pub fn numberVal(n: f64) Value {
-        return Value{ .number = n };
+    pub fn numberVal(v: f64) Value {
+        return Value{ .number = v };
+    }
+    pub fn objVal(v: *Obj) Value {
+        return Value{ .obj = v };
     }
     pub fn isNil(self: Value) bool {
         return switch (self) {
@@ -45,6 +55,24 @@ pub const Value = union(ValueType) {
             else => false,
         };
     }
+    pub fn isObj(self: Value) bool {
+        return switch (self) {
+            .obj => true,
+            else => false,
+        };
+    }
+
+    pub fn isObjType(self: Value, t: ObjType) bool {
+        return switch (self) {
+            .obj => |v| v.type == t,
+            else => false,
+        };
+    }
+
+    pub fn isString(self: Value) bool {
+        return self.isObjType(.string);
+    }
+
     pub fn isFalsey(self: Value) bool {
         return switch (self) {
             .nil => true,
@@ -57,7 +85,8 @@ pub const Value = union(ValueType) {
             .bool => |v| v == other.bool,
             .nil => true,
             .number => |v| v == other.number,
-            // else => false, //unreachable
+            // TODO: change when more obj types are valid
+            .obj => |v| std.mem.eql(u8, v.asObjString().str, other.obj.asObjString().str),
         };
     }
 };

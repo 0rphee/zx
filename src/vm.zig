@@ -7,6 +7,10 @@ const OpCode = common.OpCode;
 const debug = @import("debug.zig");
 const value = @import("value.zig");
 const Value = value.Value;
+const object = @import("object.zig");
+const Obj = object.Obj;
+const ObjString = object.ObjString;
+const memory = @import("memory.zig");
 
 pub const InterpretResult = enum {
     OK,
@@ -23,33 +27,46 @@ pub const InterpretResult = enum {
 const STACK_MAX = 256;
 
 pub const VM = struct {
+    allocator: std.mem.Allocator,
     chunk: *Chunk,
     ip: [*]u8, // ptr to next instruction to execute
     stack: [STACK_MAX]Value,
     stackTop: [*]Value,
-    pub fn new() VM {
-        return VM{ .chunk = undefined, .ip = undefined, .stack = undefined, .stackTop = undefined };
+    objects: ?*Obj,
+    pub fn new(allocator: std.mem.Allocator) VM {
+        return VM{ .allocator = allocator, .chunk = undefined, .ip = undefined, .stack = undefined, .stackTop = undefined, .objects = null };
     }
     pub fn init(self: *VM) void {
         self.resetStack();
+        self.objects = null;
     }
-    pub fn resetStack(self: *VM) void {
+    fn resetStack(self: *VM) void {
         self.stackTop = &self.stack;
     }
     pub fn free(self: *VM) void {
-        _ = self;
+        self.freeObjects();
     }
-    pub fn runFile(self: *VM, allocator: std.mem.Allocator, filename: []u8) !void {
-        const source: []const u8 = readFile(allocator, filename);
-        defer allocator.free(source);
 
-        switch (self.interpret(allocator, &source)) {
+    fn freeObjects(self: *VM) void {
+        var maybeObject = self.objects;
+        while (maybeObject) |obj| {
+            const next = obj.next;
+            obj.free(self.allocator);
+            maybeObject = next;
+        }
+    }
+
+    pub fn runFile(self: *VM, filename: []u8) !void {
+        const source: []const u8 = readFile(self.allocator, filename);
+        defer self.allocator.free(source);
+
+        switch (self.interpret(&source)) {
             .COMPILE_ERR => std.process.exit(65),
             .RUNTIME_ERR => std.process.exit(70),
             .OK => {},
         }
     }
-    pub fn repl(self: *VM, allocator: std.mem.Allocator, stdout: std.fs.File, stdin: std.fs.File) !void {
+    pub fn repl(self: *VM, stdout: std.fs.File, stdin: std.fs.File) !void {
         const outWriter = stdout.writer();
         const inReader = stdin.reader();
         var lineBuff: [1024]u8 = undefined;
@@ -59,12 +76,12 @@ pub const VM = struct {
                 try outWriter.writeByte('\n');
                 break;
             }
-            _ = self.interpret(allocator, &lineSlice);
+            _ = self.interpret(&lineSlice);
             try outWriter.writeAll("> ");
         }
     }
-    pub fn interpret(self: *VM, allocator: std.mem.Allocator, source: *const []const u8) InterpretResult {
-        var compParser = compiler.Parser.new(allocator, source);
+    pub fn interpret(self: *VM, source: *const []const u8) InterpretResult {
+        var compParser = compiler.Parser.new(self, source);
         // chunk is freed after its supposed to be run
         defer compParser.free();
 
@@ -115,7 +132,18 @@ pub const VM = struct {
                 },
                 .GREATER => if (self.binaryOP(bool, Value.boolVal, gt)) |v| return v else {},
                 .LESS => if (self.binaryOP(bool, Value.boolVal, lt)) |v| return v else {},
-                .ADD => if (self.binaryOP(f64, Value.numberVal, add)) |v| return v else {},
+                .ADD => {
+                    if (self.peek(0).isString() and self.peek(1).isString()) {
+                        self.concatenate();
+                    } else if (self.peek(0).isNumber() and self.peek(1).isNumber()) {
+                        const b = self.pop().number;
+                        const a = self.pop().number;
+                        self.push(Value.numberVal(a + b));
+                    } else {
+                        self.runtimeError("Operands must be two numbers or two strings", .{});
+                        return .RUNTIME_ERR;
+                    }
+                },
                 .SUBSTRACT => if (self.binaryOP(f64, Value.numberVal, sub)) |v| return v else {},
                 .MULTIPLY => if (self.binaryOP(f64, Value.numberVal, mul)) |v| return v else {},
                 .DIVIDE => if (self.binaryOP(f64, Value.numberVal, div)) |v| return v else {},
@@ -166,13 +194,24 @@ pub const VM = struct {
         return null;
     }
 
+    fn concatenate(self: *VM) void {
+        const b = self.pop().obj.asObjString().str;
+        const a = self.pop().obj.asObjString().str;
+
+        const newStr = self.allocator.alloc(u8, a.len + b.len) catch |err| memory.panicMemAllocating("string", err);
+        std.mem.copyForwards(u8, newStr, a);
+        std.mem.copyForwards(u8, newStr[a.len..], b);
+
+        self.push(Value.objVal(ObjString.allocateObjString(self, newStr).asObj()));
+    }
+
     fn runtimeError(self: *VM, comptime format: []const u8, args: anytype) void {
         std.debug.print(format, args);
         std.debug.print("\n", .{});
         const instruction = self.ip - self.chunk.code.items.ptr - 1;
         const line = self.chunk.lines.items[instruction];
         std.debug.print("[line {}] in script\n", .{line});
-        resetStack(self);
+        self.resetStack();
     }
 };
 

@@ -45,11 +45,11 @@ pub const Chunk = struct {
         self.constants.clearAndFree();
     }
     pub fn write(self: *Chunk, byte: u8, line: u32) void {
-        self.code.append(byte) catch |err| memory.panicReallocating(err);
-        self.lines.append(line) catch |err| memory.panicReallocating(err);
+        self.code.append(byte) catch |err| memory.panicMemReallocatingArray(err);
+        self.lines.append(line) catch |err| memory.panicMemReallocatingArray(err);
     }
     pub fn addConstant(self: *Chunk, val: Value) usize {
-        self.constants.append(val) catch |err| memory.panicReallocating(err);
+        self.constants.append(val) catch |err| memory.panicMemReallocatingArray(err);
         return self.constants.items.len - 1;
     }
 };

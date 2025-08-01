@@ -10,22 +10,29 @@ const Token = scanner.Token;
 const TokenType = scanner.TokenType;
 const value = @import("value.zig");
 const Value = value.Value;
+const object = @import("object.zig");
+const Obj = object.Obj;
+const ObjString = object.ObjString;
+const vm = @import("vm.zig");
+const VM = vm.VM;
 
 pub const Parser = struct {
+    vm: *VM,
     current: Token,
     previous: Token,
     scanner: Scanner,
     hadError: bool,
     panicMode: bool,
     compilingChunk: Chunk,
-    pub fn new(allocator: std.mem.Allocator, source: *const []const u8) Parser {
+    pub fn new(vmp: *VM, source: *const []const u8) Parser {
         return Parser{
+            .vm = vmp,
             .current = undefined,
             .previous = undefined,
             .scanner = Scanner.new(source),
             .hadError = false,
             .panicMode = false,
-            .compilingChunk = Chunk.new(allocator),
+            .compilingChunk = Chunk.new(vmp.allocator),
         };
     }
 
@@ -149,6 +156,10 @@ pub const Parser = struct {
         }
     }
 
+    fn string(self: *Parser) void {
+        self.emitConstant(Value.objVal(ObjString.copyFromString(self.vm, self.previous.slice).asObj()));
+    }
+
     fn consume(self: *Parser, ty: TokenType, msg: []const u8) void {
         if (self.current.type == ty) {
             self.advance();
@@ -223,6 +234,7 @@ fn getRule(ty: TokenType) ParseRule {
         .BANG => ParseRule{ .prefix = Parser.unary, .infix = null, .precedence = .NONE },
         .BANG_EQUAL => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .EQUALITY },
         .SLASH, .STAR => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .FACTOR },
+        .STRING => ParseRule{ .prefix = Parser.string, .infix = null, .precedence = .NONE },
         .NUMBER => ParseRule{ .prefix = Parser.number, .infix = null, .precedence = .NONE },
         .FALSE, .TRUE, .NIL => ParseRule{ .prefix = Parser.literal, .infix = null, .precedence = .NONE },
         .EQUAL_EQUAL => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .EQUALITY },
