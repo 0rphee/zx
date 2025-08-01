@@ -15,8 +15,15 @@ pub const OpCode = enum(u8) {
     SUBSTRACT,
     MULTIPLY,
     DIVIDE,
+    NOT,
     NEGATE,
     RETURN,
+    NIL,
+    TRUE,
+    FALSE,
+    EQUAL,
+    GREATER,
+    LESS,
     _,
     pub fn toU8(self: OpCode) u8 {
         return @intFromEnum(self);

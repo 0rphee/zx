@@ -98,6 +98,7 @@ pub const Scanner = struct {
 
         const c = self.advance();
         // std.debug.print("char scanner '{c}'\n", .{c});
+        if (isAlpha(c)) return self.identifier();
         return switch (c) {
             '0'...'9' => self.number(),
             '(' => Token.make(self.*, .LEFT_PAREN),
@@ -204,45 +205,50 @@ pub const Scanner = struct {
     }
 
     fn identifier(self: *Scanner) Token {
-        while (isAlpha(self.peek()) or isDigit(self.peek())) self.advance();
-        return Token.make(self, self.identifierType());
+        while (isAlpha(self.peek()) or isDigit(self.peek())) _ = self.advance();
+        return Token.make(self.*, self.identifierType());
     }
 
     fn identifierType(self: *Scanner) TokenType {
         return switch (self.start[0]) {
-            'a' => self.checkKeyword(1, 2, "nd", .AND),
-            'c' => self.checkKeyword(1, 4, "lass", .CLASS),
-            'e' => self.checkKeyword(1, 3, "lse", .ELSE),
-            'f' => {
-                if (self.current - self.start > 1) {
-                    return switch (self.start[1]) {
-                        'a' => self.checkKeyword(2, 3, "lse", .FALSE),
-                        'o' => self.checkKeyword(2, 1, "r", .FOR),
-                        'u' => self.checkKeyword(2, 1, "n", .FUN),
+            'a' => self.checkKeyword(1, "nd", .AND),
+            'c' => self.checkKeyword(1, "lass", .CLASS),
+            'e' => self.checkKeyword(1, "lse", .ELSE),
+            'f' => blk: {
+                if ((self.current - self.start) > 1) {
+                    break :blk switch (self.start[1]) {
+                        'a' => self.checkKeyword(2, "lse", .FALSE),
+                        'o' => self.checkKeyword(2, "r", .FOR),
+                        'u' => self.checkKeyword(2, "n", .FUN),
+                        else => .IDENTIFIER,
                     };
                 }
+                break :blk .IDENTIFIER;
             },
-            'i' => self.checkKeyword(1, 1, "f", .IF),
-            'n' => self.checkKeyword(1, 2, "il", .NIL),
-            'o' => self.checkKeyword(1, 1, "r", .OR),
-            'p' => self.checkKeyword(1, 4, "rint", .PRINT),
-            'r' => self.checkKeyword(1, 5, "eturn", .RETURN),
-            's' => self.checkKeyword(1, 4, "uper", .SUPER),
-            't' => {
+            'i' => self.checkKeyword(1, "f", .IF),
+            'n' => self.checkKeyword(1, "il", .NIL),
+            'o' => self.checkKeyword(1, "r", .OR),
+            'p' => self.checkKeyword(1, "rint", .PRINT),
+            'r' => self.checkKeyword(1, "eturn", .RETURN),
+            's' => self.checkKeyword(1, "uper", .SUPER),
+            't' => blk: {
                 if (self.current - self.start > 1) {
-                    return switch (self.start[1]) {
-                        'h' => self.checkKeyword(2, 2, "is", .THIS),
-                        'r' => self.checkKeyword(2, 2, "ue", .TRUE),
+                    break :blk switch (self.start[1]) {
+                        'h' => self.checkKeyword(2, "is", .THIS),
+                        'r' => self.checkKeyword(2, "ue", .TRUE),
+                        else => .IDENTIFIER,
                     };
                 }
+                break :blk .IDENTIFIER;
             },
-            'v' => self.checkKeyword(1, 2, "ar", .VAR),
-            'w' => self.checkKeyword(1, 4, "hile", .WHILE),
+            'v' => self.checkKeyword(1, "ar", .VAR),
+            'w' => self.checkKeyword(1, "hile", .WHILE),
+            else => .IDENTIFIER,
         };
     }
 
-    fn checkKeyword(self: *Scanner, start: u4, length: u4, rest: []const u8, ty: TokenType) TokenType {
-        if (std.mem.eql(self.start[start .. length + 1], // get slice of the current token
+    fn checkKeyword(self: *Scanner, start: u4, rest: []const u8, ty: TokenType) TokenType {
+        if (std.mem.eql(u8, self.start[start .. start + rest.len], // get slice of the current token
             rest))
         {
             return ty;
@@ -260,8 +266,8 @@ pub const Scanner = struct {
 };
 
 fn isAlpha(c: u8) bool {
-    switch (c) {
+    return switch (c) {
         'A'...'Z', 'a'...'z', '_' => true,
         else => false,
-    }
+    };
 }

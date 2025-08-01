@@ -90,8 +90,7 @@ pub const Parser = struct {
                 if (getRule(self.previous.type).infix) |infixRule| {
                     infixRule(self);
                 } else {
-                    // should never happen
-                    self.errorAtCurrent("Should never happen");
+                    self.errorAtCurrent("Should never happen.");
                 }
             }
         } else {
@@ -105,6 +104,12 @@ pub const Parser = struct {
         const rule = getRule(operatorType);
         self.parsePrecedence(rule.precedence); // +1
         switch (operatorType) {
+            .BANG_EQUAL => self.emitBytes(OpCode.EQUAL.toU8(), OpCode.NOT.toU8()),
+            .EQUAL_EQUAL => self.emitByte(OpCode.EQUAL.toU8()),
+            .GREATER => self.emitByte(OpCode.GREATER.toU8()),
+            .GREATER_EQUAL => self.emitBytes(OpCode.LESS.toU8(), OpCode.NOT.toU8()),
+            .LESS => self.emitByte(OpCode.LESS.toU8()),
+            .LESS_EQUAL => self.emitBytes(OpCode.GREATER.toU8(), OpCode.NOT.toU8()),
             .PLUS => self.emitByte(OpCode.ADD.toU8()),
             .MINUS => self.emitByte(OpCode.SUBSTRACT.toU8()),
             .STAR => self.emitByte(OpCode.MULTIPLY.toU8()),
@@ -119,6 +124,7 @@ pub const Parser = struct {
         self.parsePrecedence(.UNARY);
         // compile the operator instruction
         switch (operatorType) {
+            .BANG => self.emitByte(OpCode.NOT.toU8()),
             .MINUS => self.emitByte(OpCode.NEGATE.toU8()),
             else => return, // unreachable
         }
@@ -131,7 +137,16 @@ pub const Parser = struct {
 
     fn number(self: *Parser) void {
         const val: f64 = std.fmt.parseFloat(f64, self.previous.slice) catch 0.0;
-        self.emitConstant(val);
+        self.emitConstant(Value.numberVal(val));
+    }
+
+    fn literal(self: *Parser) void {
+        switch (self.previous.type) {
+            .FALSE => self.emitByte(OpCode.FALSE.toU8()),
+            .NIL => self.emitByte(OpCode.NIL.toU8()),
+            .TRUE => self.emitByte(OpCode.TRUE.toU8()),
+            else => {}, // unreachable
+        }
     }
 
     fn consume(self: *Parser, ty: TokenType, msg: []const u8) void {
@@ -205,9 +220,13 @@ fn getRule(ty: TokenType) ParseRule {
         .LEFT_PAREN => ParseRule{ .prefix = Parser.grouping, .infix = null, .precedence = .NONE },
         .MINUS => ParseRule{ .prefix = Parser.unary, .infix = Parser.binary, .precedence = .TERM },
         .PLUS => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .TERM },
-        .SLASH => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .FACTOR },
-        .STAR => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .FACTOR },
+        .BANG => ParseRule{ .prefix = Parser.unary, .infix = null, .precedence = .NONE },
+        .BANG_EQUAL => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .EQUALITY },
+        .SLASH, .STAR => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .FACTOR },
         .NUMBER => ParseRule{ .prefix = Parser.number, .infix = null, .precedence = .NONE },
+        .FALSE, .TRUE, .NIL => ParseRule{ .prefix = Parser.literal, .infix = null, .precedence = .NONE },
+        .EQUAL_EQUAL => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .EQUALITY },
+        .GREATER, .GREATER_EQUAL, .LESS, .LESS_EQUAL => ParseRule{ .prefix = null, .infix = Parser.binary, .precedence = .COMPARISON },
         else => ParseRule{ .prefix = null, .infix = null, .precedence = .NONE },
     };
 }

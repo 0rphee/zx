@@ -24,10 +24,17 @@ pub fn disassembleInstruction(chunk: Chunk, offset: usize) usize {
     const op: OpCode = @enumFromInt(instruction);
     return switch (op) {
         .CONSTANT => constantInstruction("CONSTANT", chunk, offset),
+        .NIL => simpleInstruction("NIL", offset),
+        .TRUE => simpleInstruction("TRUE", offset),
+        .FALSE => simpleInstruction("FALSE", offset),
+        .EQUAL => simpleInstruction("EQUAL", offset),
+        .GREATER => simpleInstruction("GREATER", offset),
+        .LESS => simpleInstruction("LESS", offset),
         .ADD => simpleInstruction("ADD", offset),
         .SUBSTRACT => simpleInstruction("SUBSTRACT", offset),
         .MULTIPLY => simpleInstruction("MULTIPLY", offset),
         .DIVIDE => simpleInstruction("DIVIDE", offset),
+        .NOT => simpleInstruction("NOT", offset),
         .NEGATE => simpleInstruction("NEGATE", offset),
         .RETURN => simpleInstruction("RETURN", offset),
         else => ret: {
@@ -45,7 +52,7 @@ fn simpleInstruction(name: []const u8, offset: usize) usize {
 fn constantInstruction(name: []const u8, chunk: Chunk, offset: usize) usize {
     const constantIx: u8 = chunk.code.items[offset + 1];
     std.debug.print("{s:<16} {d:>4} '", .{ name, constantIx });
-    value.printValue(chunk.constants.items[constantIx]);
+    chunk.constants.items[constantIx].print();
     std.debug.print("'\n", .{});
     return offset + 2;
 }
